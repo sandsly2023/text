@@ -1,5 +1,5 @@
 name: build geph
-on: workflow_dispatch
+on: [push]
 jobs:
 # 编译22.04的迷雾通，用于mint 21
   build_2204_geph:
@@ -66,7 +66,6 @@ jobs:
 # 编译20.04的迷雾通，用于mint 20.3
   build_2004_geph:
     name: Build_2004
-    needs: build_2204_geph
     permissions:
         contents: write
     runs-on: ubuntu-20.04
