@@ -1,8 +1,128 @@
-name: CI
-on: push
+name: build geph
+on: workflow_dispatch
 jobs:
-  build:
-    runs-on: ubuntu-latest
+# 编译22.04的迷雾通，用于mint 21
+  build_2204_geph:
+    name: Build_2204
+    permissions:
+        contents: write
+    runs-on: ubuntu-22.04
     steps:
-      - name: Run a one-line script
-        run: lsb_release -r | awk '{print $NF}' | cat | tr -d '.'
+      # 创建构建文件夹
+      - name: Create build folder
+        run: mkdir ./build
+
+      # 安装依赖软件包
+      - name: Install software
+        run: sudo apt install libgtk-3-dev libappindicator3-dev libwebkit2gtk-4.0-dev librsvg2-dev libssl-dev patchelf strace libpango1.0-dev libgdk-pixbuf2.0-dev gcc clang g++ zlib1g-dev libmpc-dev libmpfr-dev libgmp-dev  build-essential
+      
+      # 拉取迷雾通github仓库
+      - name: Clone gephgui-wry
+        run: git clone --recurse-submodules https://github.com/geph-official/gephgui-wry.git
+
+      # 构建所需依赖文件
+      - name: Build gephgui
+        run: |
+          cd gephgui-wry/gephgui
+          npm install
+          npm run build
+
+      # 构建图形界面程序
+      - name: Build gephgui-wry
+        run: |
+          cd gephgui-wry
+          cargo build --release
+
+      # 复制图形界面程序到build文件夹
+      - name: Copy gephgui-wry
+        run: cp gephgui-wry/target/release/gephgui-wry ./build
+
+      # 下载主程序
+      - name: Download gephgui-pkg
+        run: |
+          git clone https://github.com/geph-official/gephgui-pkg.git
+          cp -r gephgui-pkg/blobs/linux-x64/* ./build && cd ./build
+          bash -x pull-geph4-client.sh
+          mv ./pac-real ./pac
+          rm -rf ./pkexec ./pull-geph4-client.sh
+          echo "action_state=$(cat ./VERSION)" >> "$GITHUB_ENV"
+          echo "ubu_release=$(lsb_release -r | awk '{print $NF}' | cat | tr -d '.')" >> "$GITHUB_ENV"
+
+      # 打包TAR程序
+      - name: Create TAR archive
+        run: |
+          tar -Jcvf build_"${{ env.action_state }}"_ubu"${{ env.ubu_release }}".tar.xz ./build
+          mkdir release && cp build_*.tar.xz ./release
+
+      # 发布release
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: release/*
+          tag: geph4_${{ env.action_state }}
+          overwrite: true
+          file_glob: true
+# 编译20.04的迷雾通，用于mint 20.3
+  build_2004_geph:
+    name: Build_2004
+    needs: build_2204_geph
+    permissions:
+        contents: write
+    runs-on: ubuntu-20.04
+    steps:
+      # 创建构建文件夹
+      - name: Create build folder
+        run: mkdir ./build
+
+      # 安装依赖软件包
+      - name: Install software
+        run: sudo apt install libgtk-3-dev libappindicator3-dev libwebkit2gtk-4.0-dev librsvg2-dev libssl-dev patchelf strace libpango1.0-dev libgdk-pixbuf2.0-dev gcc clang g++ zlib1g-dev libmpc-dev libmpfr-dev libgmp-dev  build-essential
+      
+      # 拉取迷雾通github仓库
+      - name: Clone gephgui-wry
+        run: git clone --recurse-submodules https://github.com/geph-official/gephgui-wry.git
+
+      # 构建所需依赖文件
+      - name: Build gephgui
+        run: |
+          cd gephgui-wry/gephgui
+          npm install
+          npm run build
+
+      # 构建图形界面程序
+      - name: Build gephgui-wry
+        run: |
+          cd gephgui-wry
+          cargo build --release
+
+      # 复制图形界面程序到build文件夹
+      - name: Copy gephgui-wry
+        run: cp gephgui-wry/target/release/gephgui-wry ./build
+
+      # 下载主程序
+      - name: Download gephgui-pkg
+        run: |
+          git clone https://github.com/geph-official/gephgui-pkg.git
+          cp -r gephgui-pkg/blobs/linux-x64/* ./build && cd ./build
+          bash -x pull-geph4-client.sh
+          mv ./pac-real ./pac
+          rm -rf ./pkexec ./pull-geph4-client.sh
+          echo "action_state=$(cat ./VERSION)" >> "$GITHUB_ENV"
+          echo "ubu_release=$(lsb_release -r | awk '{print $NF}' | cat | tr -d '.')" >> "$GITHUB_ENV"
+
+      # 打包TAR程序
+      - name: Create TAR archive
+        run: |
+          tar -Jcvf build_"${{ env.action_state }}"_ubu"${{ env.ubu_release }}".tar.xz ./build
+          mkdir release && cp build_*.tar.xz ./release
+
+      # 发布release
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: release/*
+          tag: geph4_${{ env.action_state }}
+          overwrite: true
+          file_glob: true
